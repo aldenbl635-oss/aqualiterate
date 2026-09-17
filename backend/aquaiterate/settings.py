@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'apps.ai_advisory',
     'apps.dashboard',
     'apps.simulation',
+    'apps.pid_engine',
 ]
 
 MIDDLEWARE = [

@@ -21,4 +21,5 @@ urlpatterns = [
     path('api/', include('apps.ai_advisory.urls')),
     path('api/', include('apps.dashboard.urls')),
     path('api/sites/', include('apps.simulation.urls')),
+    path('api/', include('apps.pid_engine.urls')),
 ]
