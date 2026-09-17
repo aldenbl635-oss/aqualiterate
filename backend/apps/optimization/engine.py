@@ -264,7 +264,7 @@ class WaterPinchOptimizer:
                 f'x_{si}_{sj}_{sk}', lowBound=0, cat='Continuous'
             )
 
-        # Objective
+        # We will build the objective up as a list of terms
         obj_terms = []
         for (si, sj, sk), var in x.items():
             rc = self.routing_costs.get((si, sj, sk), 0.0)
@@ -276,8 +276,6 @@ class WaterPinchOptimizer:
                 total_unit_cost += self.freshwater_penalty
 
             obj_terms.append(total_unit_cost * var)
-
-        prob += pulp.lpSum(obj_terms), 'Total_Operating_Cost'
 
         # Source capacity constraints
         for src_id, src in self.sources.items():
@@ -303,18 +301,21 @@ class WaterPinchOptimizer:
                     total_flow + unmet_vars[sink_id] >= sink.required_flow,
                     f'SinkDemand_{sink_id}'
                 )
-                # Penalise unmet demand heavily
-                prob.objective += 1000 * unmet_vars[sink_id]
+                # Penalise unmet demand heavily in the objective
+                obj_terms.append(1000 * unmet_vars[sink_id])
             else:
                 prob += (
                     total_flow >= sink.required_flow,
                     f'SinkDemand_{sink_id}'
                 )
+                
+        # Set the objective function all at once
+        prob += pulp.lpSum(obj_terms), 'Total_Operating_Cost'
 
         # Treatment capacity constraints
         for tx_id, tx in self.treatments.items():
             routes_via_tx = [(si, sj, sk) for (si, sj, sk) in feasible_routes if sk == tx_id]
-            if routes_via_tx:
+            if routes_via_tx and tx.max_flow is not None:
                 prob += (
                     pulp.lpSum(x[(si, sj, sk)] for (si, sj, sk) in routes_via_tx)
                     <= tx.max_flow,

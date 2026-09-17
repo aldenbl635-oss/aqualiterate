@@ -83,7 +83,17 @@ class SimulationEngine:
 
     def _generate_source_values(self, src, tick, scenario):
         """Return (flow, quality_updates) for a source at the given tick/scenario."""
-        base_flow = float(src._base_flow if hasattr(src, '_base_flow') else src.available_flow)
+        from apps.network.process_logic import PROCESS_TEMPLATES
+        base_flow = 100.0
+        if src.zone and src.zone.process_type in PROCESS_TEMPLATES:
+            # Usually source flows are some % of demand, approx 100
+            demand = PROCESS_TEMPLATES[src.zone.process_type].get('demand', 100.0)
+            base_flow = demand * PROCESS_TEMPLATES[src.zone.process_type].get('recovery_potential', 1.0)
+        
+        if base_flow == 0 or src.is_freshwater:
+            # Freshwater can supply arbitrary amounts based on initial setup
+            base_flow = 1000.0
+
 
         # Smooth oscillation: ±5% of base over a 48-step period
         flow = _wave(tick, base_flow, base_flow * 0.05, period=48)
@@ -129,7 +139,11 @@ class SimulationEngine:
 
     def _generate_sink_demand(self, sink, tick, scenario):
         """Return new required_flow for a sink at the given tick/scenario."""
-        base_demand = float(sink.required_flow or 50)
+        from apps.network.process_logic import PROCESS_TEMPLATES
+        base_demand = 50.0
+        if sink.zone and sink.zone.process_type in PROCESS_TEMPLATES:
+            base_demand = PROCESS_TEMPLATES[sink.zone.process_type].get('demand', 50.0)
+
         demand = _wave(tick, base_demand, base_demand * 0.08, period=32)
 
         if scenario == 'HIGH_DEMAND':
