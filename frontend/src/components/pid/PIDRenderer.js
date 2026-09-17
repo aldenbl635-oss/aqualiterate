@@ -68,13 +68,15 @@ const SymbolNode = ({ node, onClick, selected }) => {
     );
 };
 
-const PIDRenderer = ({ nodes = [], edges = [], sourceImage = null, documentWidth = 2000, documentHeight = 1500, onNodeClick }) => {
+const PIDRenderer = ({ nodes = [], edges = [], sourceImage = null, onNodeClick }) => {
     const [selectedId, setSelectedId] = useState(null);
-    const [viewMode, setViewMode] = useState('reconstructed'); // 'original' or 'reconstructed'
+    const [viewMode, setViewMode] = useState('original'); // Start with original to see image
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const [imgDims, setImgDims] = useState({ width: 2000, height: 1200 }); // Default, updated on load
+    const containerRef = useRef(null);
     const svgRef = useRef(null);
 
     const handleNodeClick = (node) => {
@@ -107,9 +109,26 @@ const PIDRenderer = ({ nodes = [], edges = [], sourceImage = null, documentWidth
     };
 
     const handleFitScreen = () => {
-        setZoom(1);
-        setPan({ x: 0, y: 0 });
+        if (!containerRef.current) return;
+        const containerWidth = containerRef.current.clientWidth;
+        const containerHeight = containerRef.current.clientHeight;
+
+        const scale = Math.min(
+            containerWidth / imgDims.width,
+            containerHeight / imgDims.height
+        );
+
+        setZoom(scale * 0.95); // 95% to leave a tiny padding
+        setPan({
+            x: (containerWidth - (imgDims.width * scale * 0.95)) / 2,
+            y: (containerHeight - (imgDims.height * scale * 0.95)) / 2
+        });
     };
+
+    // Auto-fit when dimensions load
+    useEffect(() => {
+        handleFitScreen();
+    }, [imgDims.width, imgDims.height]);
 
     // Ensure we parse missing nodes nicely
     const safeNodes = (nodes || []).filter(n => n.id);
@@ -132,6 +151,7 @@ const PIDRenderer = ({ nodes = [], edges = [], sourceImage = null, documentWidth
             </div>
 
             <div
+                ref={containerRef}
                 style={{ flex: 1, overflow: 'hidden', background: viewMode === 'original' ? '#1e293b' : '#f8fafc', position: 'relative', cursor: isDragging ? 'grabbing' : 'grab' }}
                 onWheel={handleWheel}
                 onMouseDown={handleMouseDown}
@@ -143,37 +163,48 @@ const PIDRenderer = ({ nodes = [], edges = [], sourceImage = null, documentWidth
                 <div style={{
                     transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                     transformOrigin: '0 0',
-                    width: documentWidth,
-                    height: documentHeight,
+                    width: imgDims.width,
+                    height: imgDims.height,
                     position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    marginLeft: `-${documentWidth / 2}px`,
-                    marginTop: `-${documentHeight / 2}px`
+                    top: 0,
+                    left: 0
                 }}>
 
-                    {viewMode === 'original' && sourceImage && (
-                        <img src={sourceImage} alt="Original P&ID Source" style={{ width: '100%', height: '100%', display: 'block', pointerEvents: 'none' }} />
+                    {/* Always render the image to get dimensions, hide visually if in reconstructed view */}
+                    {sourceImage && (
+                        <img
+                            src={sourceImage}
+                            alt="Original P&ID Source"
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                display: viewMode === 'original' ? 'block' : 'none',
+                                pointerEvents: 'none'
+                            }}
+                            onLoad={(e) => setImgDims({ width: e.target.naturalWidth, height: e.target.naturalHeight })}
+                        />
                     )}
 
                     {viewMode === 'reconstructed' && (
                         <svg
                             ref={svgRef}
-                            width={documentWidth}
-                            height={documentHeight}
-                            viewBox={`0 0 ${documentWidth} ${documentHeight}`}
-                            style={{ display: 'block' }}
+                            width="100%"
+                            height="100%"
+                            viewBox={`0 0 ${imgDims.width} ${imgDims.height}`}
+                            style={{ display: 'block', position: 'absolute', top: 0, left: 0 }}
                         >
                             <defs>
                                 <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
                                     <path d="M0,0 L0,6 L9,3 z" fill="#2563eb" />
                                 </marker>
-                                <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                                    <rect width="40" height="40" fill="none" stroke="#e2e8f0" strokeWidth="1" />
-                                </pattern>
                             </defs>
 
-                            <rect width="100%" height="100%" fill="url(#grid)" />
+                            <rect width="100%" height="100%" fill="#f1f5f9" />
+
+                            {/* Faint overlay of the original image for context */}
+                            {sourceImage && (
+                                <image href={sourceImage} width="100%" height="100%" opacity="0.15" />
+                            )}
 
                             {safeEdges.map(e => (
                                 <OrthogonalEdge

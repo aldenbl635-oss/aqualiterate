@@ -88,9 +88,7 @@ export default function NetworkMapPage() {
                         <PIDRenderer
                             nodes={pidNodes}
                             edges={pidEdges}
-                            sourceImage={site?.layout_image}
-                            documentWidth={site?.pid_width || 2000}
-                            documentHeight={site?.pid_height || 1200}
+                            sourceImage={site?.layout_image ? (site.layout_image.startsWith('http') ? site.layout_image : `http://localhost:8000${site.layout_image}`) : null}
                         />
                     </div>
                 )}
