@@ -1,16 +1,27 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip, LayerGroup, GeoJSON } from 'react-leaflet';
+import React, { useState, useEffect } from 'react';
+import { MapContainer, ImageOverlay, CircleMarker, Polyline, Tooltip, LayerGroup } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { getNetworkGeoJSON, getSources, getSinks } from '../services/api';
+import api, { getNetworkGeoJSON } from '../services/api';
 import { useSite } from '../hooks/useSite';
 import DigitalTwinView from '../components/digitalTwin/DigitalTwinView';
 import SimulationControlPanel from '../components/simulation/SimulationControlPanel';
 
 const DEMO_CENTER = [13.0827, 80.2785]; // Chennai demo coords
 
+// Helper to map normalized coordinates to image bounds [0, 1000]
+const mapCoords = (coords) => {
+    if (!coords) return null;
+    let x = coords[0];
+    let y = coords[1];
+    if (x > 1) x = (x % 800) / 800;
+    if (y > 1) y = (y % 600) / 600;
+    return [y * 1000, x * 1000];
+};
+
 function SourceMarker({ feature, currentTimestamp }) {
     const p = feature.properties;
-    const pos = feature.geometry ? [feature.geometry.coordinates[1], feature.geometry.coordinates[0]] : null;
+    const pos = mapCoords(feature.geometry?.coordinates);
     if (!pos) return null;
     return (
         <CircleMarker
@@ -46,7 +57,7 @@ function SourceMarker({ feature, currentTimestamp }) {
 
 function SinkMarker({ feature, currentTimestamp }) {
     const p = feature.properties;
-    const pos = feature.geometry ? [feature.geometry.coordinates[1], feature.geometry.coordinates[0]] : null;
+    const pos = mapCoords(feature.geometry?.coordinates);
     if (!pos) return null;
     return (
         <CircleMarker
@@ -162,16 +173,23 @@ function RoutePolyline({ positions, isOptimized, isRecovery, featureProps, curre
 export default function NetworkMapPage() {
     const { activeSiteId } = useSite();
     const [geoJSON, setGeoJSON] = useState(null);
+    const [site, setSite] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [viewMode, setViewMode] = useState('2d');
     const [currentTimestamp, setCurrentTimestamp] = useState(null);
 
-    const fetchGraph = () => {
+    const fetchGraph = async () => {
         if (!activeSiteId) return;
-        getNetworkGeoJSON(activeSiteId)
-            .then(setGeoJSON)
-            .catch(() => setError('Failed to load network data'));
+        try {
+            const siteRes = await api.get(`/api/sites/${activeSiteId}/`);
+            setSite(siteRes.data);
+            const geoRes = await getNetworkGeoJSON(activeSiteId);
+            setGeoJSON(geoRes);
+        } catch (e) {
+            console.error(e);
+            setError('Failed to load network data');
+        }
     };
 
     useEffect(() => {
@@ -252,23 +270,27 @@ export default function NetworkMapPage() {
                 {!loading && !error && viewMode === '2d' && (
                     <div className="map-container" style={{ height: '68vh' }}>
                         <MapContainer
-                            center={DEMO_CENTER}
-                            zoom={17}
-                            style={{ height: '100%', width: '100%' }}
+                            crs={L.CRS.Simple}
+                            bounds={[[0, 0], [1000, 1000]]}
+                            style={{ height: '100%', width: '100%', background: '#010810' }}
                             zoomControl={true}
+                            minZoom={-2}
                         >
-                            <TileLayer
-                                attribution='&copy; OpenStreetMap contributors'
-                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                opacity={0.3}
-                            />
+                            {site?.layout_image && (
+                                <ImageOverlay
+                                    url={site.layout_image}
+                                    bounds={[[0, 0], [1000, 1000]]}
+                                    opacity={0.4}
+                                />
+                            )}
 
                             {/* Network connections (background) */}
                             <LayerGroup>
                                 {connections.map((f, i) => {
                                     const coords = f.geometry?.coordinates;
                                     if (!coords) return null;
-                                    return <RoutePolyline key={`conn-${i}`} positions={coords.map(c => [c[1], c[0]])} isOptimized={false} isRecovery={false} />;
+                                    const mappedCoords = coords.map(c => mapCoords(c));
+                                    return <RoutePolyline key={`conn-${i}`} positions={mappedCoords} isOptimized={false} isRecovery={false} />;
                                 })}
                             </LayerGroup>
 
@@ -277,15 +299,19 @@ export default function NetworkMapPage() {
                                 {optimizedRoutes.map((f, i) => {
                                     const coords = f.geometry?.coordinates;
                                     if (!coords) return null;
-                                    return <RoutePolyline key={`opt-${i}`} positions={coords.map(c => [c[1], c[0]])} isOptimized={true} isRecovery={false} featureProps={f.properties} currentTimestamp={currentTimestamp} />;
+                                    const mappedCoords = coords.map(c => mapCoords(c));
+                                    return <RoutePolyline key={`opt-${i}`} positions={mappedCoords} isOptimized={true} isRecovery={false} featureProps={f.properties} currentTimestamp={currentTimestamp} />;
                                 })}
                             </LayerGroup>
 
                             {/* Cycle recovery edges */}
                             <LayerGroup>
-                                {recoveryEdges.map((re, i) => (
-                                    <RoutePolyline key={`rec-${i}`} positions={re.positions} isOptimized={false} isRecovery={true} featureProps={re.properties} currentTimestamp={currentTimestamp} />
-                                ))}
+                                {recoveryEdges.map((re, i) => {
+                                    const mappedCoords = re.positions.map(c => mapCoords([c[1], c[0]]));
+                                    return (
+                                        <RoutePolyline key={`rec-${i}`} positions={mappedCoords} isOptimized={false} isRecovery={true} featureProps={re.properties} currentTimestamp={currentTimestamp} />
+                                    );
+                                })}
                             </LayerGroup>
 
                             {/* Sources */}
