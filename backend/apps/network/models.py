@@ -1,0 +1,73 @@
+from django.db import models
+
+
+class WaterSource(models.Model):
+    site = models.ForeignKey('sites.Site', on_delete=models.CASCADE, related_name='sources')
+    zone = models.ForeignKey('sites.Zone', on_delete=models.SET_NULL, null=True, blank=True)
+    name = models.CharField(max_length=200)
+    source_type = models.CharField(max_length=50)
+    description = models.TextField(blank=True, null=True)
+    
+    available_flow = models.FloatField(help_text="Available flow capacity")
+    unit = models.CharField(max_length=20, default='m3/h')
+    location = models.JSONField(null=True, blank=True)
+
+    quality_profile = models.ForeignKey('water_quality.WaterQualityProfile', on_delete=models.SET_NULL, null=True, blank=True)
+    is_freshwater = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.name} [{self.site.name}]"
+
+
+class WaterSink(models.Model):
+    site = models.ForeignKey('sites.Site', on_delete=models.CASCADE, related_name='sinks')
+    zone = models.ForeignKey('sites.Zone', on_delete=models.SET_NULL, null=True, blank=True)
+    name = models.CharField(max_length=200)
+    sink_type = models.CharField(max_length=50)
+    description = models.TextField(blank=True, null=True)
+
+    required_flow = models.FloatField(help_text="Required flow demand")
+    unit = models.CharField(max_length=20, default='m3/h')
+    location = models.JSONField(null=True, blank=True)
+
+    quality_requirement = models.ForeignKey('water_quality.WaterQualityRequirement', on_delete=models.SET_NULL, null=True, blank=True)
+    allow_partial_demand = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.name} [{self.site.name}]"
+
+
+class TreatmentOption(models.Model):
+    site = models.ForeignKey('sites.Site', on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+    treatment_type = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+
+    output_quality_profile = models.ForeignKey('water_quality.WaterQualityProfile', on_delete=models.SET_NULL, null=True, blank=True)
+    max_flow = models.FloatField(null=True, blank=True)
+    
+    # Cost model
+    cost_per_unit = models.FloatField(help_text="Cost per m3 treated", default=0.0)
+    fixed_cost = models.FloatField(default=0.0)
+
+    def __str__(self):
+        return f"{self.name} ({self.treatment_type})"
+
+
+class NetworkConnection(models.Model):
+    site = models.ForeignKey('sites.Site', on_delete=models.CASCADE, related_name='connections')
+    source = models.ForeignKey(WaterSource, on_delete=models.CASCADE, related_name='outgoing_connections')
+    sink = models.ForeignKey(WaterSink, on_delete=models.CASCADE, related_name='incoming_connections')
+    treatment_option = models.ForeignKey(TreatmentOption, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # Demo assumptions
+    routing_cost = models.FloatField(default=0.0)
+    geometry = models.JSONField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ('source', 'sink', 'treatment_option')
+
+    def __str__(self):
+        tx = f" via {self.treatment_option.name}" if self.treatment_option else " (direct)"
+        return f"{self.source.name} -> {self.sink.name}{tx}"

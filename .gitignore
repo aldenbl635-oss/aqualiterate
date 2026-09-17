@@ -1,0 +1,73 @@
+# ── Python / Django ───────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.pytest_cache/
+htmlcov/
+
+# Django specific
+*.sqlite3
+db.sqlite3
+*.log
+local_settings.py
+media/
+staticfiles/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# ── Node / React ──────────────────────────────────────────
+frontend/node_modules/
+frontend/build/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Environment variables ─────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── OS / Editor junk ─────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.iml
+
+# ── Docker (kept but not used in native mode) ─────────────
+docker-compose.override.yml
+
+# ── Datasets (raw binaries / large files) ────────────────
+datasets/*.csv
+datasets/*.geojson
+
+# ── Misc scripts ─────────────────────────────────────────
+backend/apply_tnpcb_dataset.py
