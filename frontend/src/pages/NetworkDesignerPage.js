@@ -19,10 +19,8 @@ export default function NetworkDesignerPage() {
     // Edit fields
     const [editMode, setEditMode] = useState(false);
     const [editProcess, setEditProcess] = useState('');
-
+    const [dynamicProcessOptions, setDynamicProcessOptions] = useState([]);
     const imgRef = useRef(null);
-
-    const PROCESS_OPTIONS = ['Cooling', 'Boiler', 'Washing', 'Treatment', 'Storage'];
 
     const loadData = async () => {
         if (!activeSiteId) return;
@@ -32,6 +30,13 @@ export default function NetworkDesignerPage() {
             setSite(siteRes.data);
             const zoneRes = await api.get(`/api/sites/${activeSiteId}/zones/`);
             setZones(zoneRes.data.results || zoneRes.data);
+
+            try {
+                const processesRes = await api.get(`/api/sites/process_templates/`);
+                setDynamicProcessOptions(processesRes.data);
+            } catch (err) {
+                console.error("Could not fetch process templates", err);
+            }
 
             if (siteRes.data.layout_image) {
                 setWorkflowStep(4);
@@ -335,7 +340,7 @@ export default function NetworkDesignerPage() {
                                                 onChange={(e) => setEditProcess(e.target.value)}
                                             >
                                                 <option value="">-- Unconfirmed --</option>
-                                                {PROCESS_OPTIONS.map(p => (
+                                                {dynamicProcessOptions.map(p => (
                                                     <option key={p} value={p}>{p}</option>
                                                 ))}
                                             </select>
