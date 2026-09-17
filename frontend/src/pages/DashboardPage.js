@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getDashboardKPIs, getReports, getAIRecommendations } from '../services/api';
 import { useSite } from '../hooks/useSite';
+import SimulationControlPanel from '../components/simulation/SimulationControlPanel';
 
 function KPICard({ label, value, unit, accentColor, icon }) {
     return (
@@ -79,6 +80,8 @@ export default function DashboardPage() {
             </div>
 
             <div className="page-body">
+                <SimulationControlPanel onSimulationUpdate={refresh} />
+
                 {loading && <div className="loading-state"><div className="spinner" /><span>Loading KPIs…</span></div>}
 
                 {!loading && kpis && (

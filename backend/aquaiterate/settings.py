@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'apps.reports',
     'apps.ai_advisory',
     'apps.dashboard',
+    'apps.simulation',
 ]
 
 MIDDLEWARE = [

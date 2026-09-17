@@ -334,4 +334,12 @@ class Command(BaseCommand):
             'DEMO DATA loaded successfully. '
             'These are synthetic values — NOT TNPCB measurements.'
         ))
+        
+        # --- Initialize Simulation and Optimization ---
+        from apps.simulation.engine import SimulationEngine
+        self.stdout.write('  Initializing simulation engine and optimization runs...')
+        engine = SimulationEngine(site.id)
+        # Advance slightly just to populate first state + reading + optimize
+        engine.generate_next_tick()
+        
         self.stdout.write(f'  Site ID: {site.id}')

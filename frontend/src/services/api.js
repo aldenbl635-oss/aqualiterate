@@ -101,4 +101,11 @@ export const getAIRecommendations = (siteId) =>
 export const updateAIRecommendation = (recId, data) =>
     api.patch(`/api/ai-recommendations/${recId}/`, data).then((r) => r.data);
 
+// ── Simulation ────────────────────────────────────────────
+export const getSimulationState = (siteId) =>
+    api.get(`/api/sites/${siteId}/simulation/state/`).then((r) => r.data);
+export const controlSimulation = (siteId, data) =>
+    api.post(`/api/sites/${siteId}/simulation/control/`, data).then((r) => r.data);
+
 export default api;
+

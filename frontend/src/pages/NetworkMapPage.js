@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { getNetworkGeoJSON, getSources, getSinks } from '../services/api';
 import { useSite } from '../hooks/useSite';
 import DigitalTwinView from '../components/digitalTwin/DigitalTwinView';
+import SimulationControlPanel from '../components/simulation/SimulationControlPanel';
 
 const DEMO_CENTER = [13.0827, 80.2785]; // Chennai demo coords
 
@@ -131,14 +132,23 @@ export default function NetworkMapPage() {
     const [error, setError] = useState('');
     const [viewMode, setViewMode] = useState('2d');
 
-    useEffect(() => {
+    const fetchGraph = () => {
         if (!activeSiteId) return;
-        setLoading(true);
         getNetworkGeoJSON(activeSiteId)
             .then(setGeoJSON)
-            .catch(() => setError('Failed to load network data'))
-            .finally(() => setLoading(false));
+            .catch(() => setError('Failed to load network data'));
+    };
+
+    useEffect(() => {
+        setLoading(true);
+        fetchGraph();
+        setTimeout(() => setLoading(false), 500); // small artificial minimum loading delay
     }, [activeSiteId]);
+
+    const handleSimulationUpdate = (simData) => {
+        // If simulation timestamp advances, we re-fetch the geoJSON silently behind the scenes
+        fetchGraph();
+    };
 
     const sources = geoJSON?.features?.filter(f => f.properties.type === 'source') || [];
     const sinks = geoJSON?.features?.filter(f => f.properties.type === 'sink') || [];
@@ -181,6 +191,8 @@ export default function NetworkMapPage() {
             </div>
 
             <div className="page-body">
+                <SimulationControlPanel onSimulationUpdate={handleSimulationUpdate} />
+
                 {/* Legend */}
                 <div className="card mb-4">
                     <div className="card-body" style={{ padding: '12px 20px' }}>

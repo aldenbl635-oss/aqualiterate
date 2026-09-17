@@ -20,4 +20,5 @@ urlpatterns = [
     path('api/', include('apps.reports.urls')),
     path('api/', include('apps.ai_advisory.urls')),
     path('api/', include('apps.dashboard.urls')),
+    path('api/sites/', include('apps.simulation.urls')),
 ]

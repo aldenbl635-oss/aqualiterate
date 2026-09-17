@@ -249,67 +249,105 @@ function TreatmentUnit({ position, onClick, isSelected }) {
 }
 
 // ─── Water Pipe (TubeGeometry) ─────────────────────────────────────────────────
+const PIPE_COLORS = {
+    network: { core: '#1a4a7a', glow: '#1a4a7a', glowIntensity: 0.5, radius: 0.14, glowRadius: 0.28 },
+    optimized: { core: '#00e8ff', glow: '#00e8ff', glowIntensity: 2.5, radius: 0.24, glowRadius: 0.52 },
+    recovery: { core: '#00ff7f', glow: '#00ff7f', glowIntensity: 2.5, radius: 0.24, glowRadius: 0.52 },
+    selected: { core: '#ffffff', glow: '#ffffff', glowIntensity: 3.0, radius: 0.26, glowRadius: 0.54 },
+};
+
 function WaterPipe({ points, isOptimized, isRecovery, isSelected, onClick }) {
-    let color = '#0a3050';
-    let emissive = '#000000';
-    let emissiveIntensity = 0;
-    const radius = (isOptimized || isRecovery) ? 0.22 : 0.12;
+    const kind = isSelected ? 'selected' : isOptimized ? 'optimized' : isRecovery ? 'recovery' : 'network';
+    const style = PIPE_COLORS[kind];
 
-    if (isSelected) {
-        color = '#ffffff'; emissive = '#ffffff'; emissiveIntensity = 1;
-    } else if (isOptimized) {
-        color = '#00d4ff'; emissive = '#00d4ff'; emissiveIntensity = 0.55;
-    } else if (isRecovery) {
-        color = '#22c55e'; emissive = '#22c55e'; emissiveIntensity = 0.55;
-    }
-
-    const geometry = useMemo(() => {
+    const coreGeom = useMemo(() => {
         const curve = new THREE.CatmullRomCurve3(points.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
-        return new THREE.TubeGeometry(curve, 28, radius, 8, false);
-    }, [points, radius]);
+        return new THREE.TubeGeometry(curve, 32, style.radius, 10, false);
+    }, [points, style.radius]);
 
-    useEffect(() => () => geometry.dispose(), [geometry]);
+    const glowGeom = useMemo(() => {
+        const curve = new THREE.CatmullRomCurve3(points.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+        return new THREE.TubeGeometry(curve, 32, style.glowRadius, 10, false);
+    }, [points, style.glowRadius]);
+
+    useEffect(() => () => { coreGeom.dispose(); glowGeom.dispose(); }, [coreGeom, glowGeom]);
+
+    const isActive = isOptimized || isRecovery || isSelected;
 
     return (
-        <mesh geometry={geometry} onClick={e => { e.stopPropagation(); onClick && onClick(); }}>
-            <meshLambertMaterial
+        <group onClick={e => { e.stopPropagation(); onClick && onClick(); }}>
+            {/* Outer glow shell — only on active pipes */}
+            {isActive && (
+                <mesh geometry={glowGeom}>
+                    <meshStandardMaterial
+                        color={style.glow}
+                        emissive={style.glow}
+                        emissiveIntensity={0.6}
+                        transparent
+                        opacity={0.18}
+                        side={THREE.BackSide}
+                    />
+                </mesh>
+            )}
+            {/* Core pipe */}
+            <mesh geometry={coreGeom}>
+                <meshStandardMaterial
+                    color={style.core}
+                    emissive={style.core}
+                    emissiveIntensity={isActive ? style.glowIntensity : 0.3}
+                    roughness={0.2}
+                    metalness={0.5}
+                />
+            </mesh>
+        </group>
+    );
+}
+
+// ─── Pipe Connector (vertical drop from pipe to ground level) ─────────────────
+function PipeConnector({ x, z, fromY, toY, isActive }) {
+    const cy = (fromY + toY) / 2;
+    const h = Math.abs(fromY - toY);
+    const color = isActive ? '#00e8ff' : '#1a4a7a';
+    return (
+        <mesh position={[x, cy, z]}>
+            <cylinderGeometry args={[0.14, 0.14, h, 8]} />
+            <meshStandardMaterial
                 color={color}
-                emissive={emissive}
-                emissiveIntensity={emissiveIntensity}
+                emissive={color}
+                emissiveIntensity={isActive ? 1.8 : 0.3}
+                roughness={0.2}
+                metalness={0.5}
             />
         </mesh>
     );
 }
 
-// ─── Pipe Connector (vertical drop from pipe to ground level) ─────────────────
-function PipeConnector({ x, z, fromY, toY }) {
-    const cy = (fromY + toY) / 2;
-    const h = Math.abs(fromY - toY);
-    return (
-        <mesh position={[x, cy, z]}>
-            <cylinderGeometry args={[0.12, 0.12, h, 8]} />
-            <meshLambertMaterial color="#0a3050" />
-        </mesh>
-    );
-}
-
 // ─── Flow Particle ────────────────────────────────────────────────────────────
-function FlowParticle({ points, offset, color }) {
+function FlowParticle({ points, offset, color, speed = 0.28 }) {
     const ref = useRef();
-    const tRef = useRef(offset);
+    const trailRef = useRef();
+    const tRef = useRef(offset % 1);
     const curve = useMemo(
         () => new THREE.CatmullRomCurve3(points.map(([x, y, z]) => new THREE.Vector3(x, y, z))),
         [points]
     );
     useFrame((_, dt) => {
-        tRef.current = (tRef.current + dt * 0.3) % 1;
+        tRef.current = (tRef.current + dt * speed) % 1;
         if (ref.current) ref.current.position.copy(curve.getPoint(tRef.current));
+        const trailT = Math.max(0, tRef.current - 0.018);
+        if (trailRef.current) trailRef.current.position.copy(curve.getPoint(trailT));
     });
     return (
-        <mesh ref={ref}>
-            <sphereGeometry args={[0.25, 8, 8]} />
-            <meshLambertMaterial color={color} emissive={color} emissiveIntensity={2.5} />
-        </mesh>
+        <group>
+            <mesh ref={ref}>
+                <sphereGeometry args={[0.30, 10, 10]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={5} />
+            </mesh>
+            <mesh ref={trailRef}>
+                <sphereGeometry args={[0.18, 8, 8]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.5} transparent opacity={0.45} />
+            </mesh>
+        </group>
     );
 }
 
@@ -484,10 +522,14 @@ function SceneContent({ sources, sinks, connections, optimizedRoutes, recoveryEd
 
     return (
         <>
-            {/* Lighting */}
-            <ambientLight intensity={1.2} />
-            <directionalLight position={[12, 20, 12]} intensity={1.5} color="#c0ddf0" />
-            <directionalLight position={[-10, 15, -8]} intensity={0.8} color="#8090cc" />
+            {/* Lighting: boosted ambient + pipe-level accent lights */}
+            <ambientLight intensity={1.8} />
+            <directionalLight position={[12, 20, 12]} intensity={2.0} color="#c0ddf0" />
+            <directionalLight position={[-10, 15, -8]} intensity={1.0} color="#8090cc" />
+            {/* Cyan pipe accent light — illuminates supply pipes */}
+            <pointLight position={[0, PIPE_Y + 2, 0]} intensity={4.0} color="#00e8ff" distance={45} decay={1.2} />
+            {/* Green recovery light */}
+            <pointLight position={[-8, PIPE_Y + 2, 8]} intensity={3.0} color="#00ff7f" distance={35} decay={1.5} />
             <pointLight position={[0, 14, 0]} intensity={2.0} color="#00d4ff" distance={60} decay={1.5} />
             <pointLight position={[-10, 8, 10]} intensity={1.0} color="#aa55ff" distance={35} decay={1.5} />
 
@@ -559,10 +601,10 @@ function SceneContent({ sources, sinks, connections, optimizedRoutes, recoveryEd
 
             {/* ── Pipe verticle connectors at nodes (visual polish) ────────────── */}
             {srcPositions.map(([x, , z], i) => (
-                <PipeConnector key={`svc-${i}`} x={x} z={z} fromY={3.9} toY={PIPE_Y} />
+                <PipeConnector key={`svc-${i}`} x={x} z={z} fromY={3.9} toY={PIPE_Y} isActive={optimizedRoutes.length > 0} />
             ))}
             {snkPositions.map(([x, , z], i) => (
-                <PipeConnector key={`dvc-${i}`} x={x} z={z} fromY={1.82} toY={PIPE_Y} />
+                <PipeConnector key={`dvc-${i}`} x={x} z={z} fromY={1.82} toY={PIPE_Y} isActive={optimizedRoutes.length > 0} />
             ))}
 
             {/* ── Pipes ─────────────────────────────────────────────────────────── */}
@@ -570,7 +612,8 @@ function SceneContent({ sources, sinks, connections, optimizedRoutes, recoveryEd
                 <WaterPipe
                     key={`pipe-${i}`}
                     points={p.points}
-                    isOptimized={p.optimized}
+                    isOptimized={!!p.optimized}
+                    isRecovery={!!p.recovery}
                     isSelected={sel && sel._pipeIdx === i}
                     onClick={() => select({ ...p.data, _pipeIdx: i })}
                 />
