@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import AdminLayout from './components/AdminLayout';
 import DashboardPage from './pages/DashboardPage';
 import NetworkMapPage from './pages/NetworkMapPage';
+import NetworkDesignerPage from './pages/NetworkDesignerPage';
 import OptimizationPage from './pages/OptimizationPage';
 import WaterQualityPage from './pages/WaterQualityPage';
 import ReportsPage from './pages/ReportsPage';
@@ -37,6 +38,7 @@ function App() {
                     }>
                         <Route index element={<Navigate to="/admin/dashboard" />} />
                         <Route path="admin/dashboard" element={<DashboardPage />} />
+                        <Route path="admin/designer" element={<NetworkDesignerPage />} />
                         <Route path="admin/network" element={<NetworkMapPage />} />
                         <Route path="admin/optimization" element={<OptimizationPage />} />
                         <Route path="admin/water-quality" element={<WaterQualityPage />} />

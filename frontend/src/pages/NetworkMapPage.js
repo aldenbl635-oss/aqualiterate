@@ -131,6 +131,7 @@ export default function NetworkMapPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [viewMode, setViewMode] = useState('2d');
+    const [currentTimestamp, setCurrentTimestamp] = useState(null);
 
     const fetchGraph = () => {
         if (!activeSiteId) return;
@@ -146,6 +147,9 @@ export default function NetworkMapPage() {
     }, [activeSiteId]);
 
     const handleSimulationUpdate = (simData) => {
+        if (simData?.simulation?.current_timestamp) {
+            setCurrentTimestamp(simData.simulation.current_timestamp);
+        }
         // If simulation timestamp advances, we re-fetch the geoJSON silently behind the scenes
         fetchGraph();
     };
@@ -270,6 +274,7 @@ export default function NetworkMapPage() {
                         connections={connections}
                         optimizedRoutes={optimizedRoutes}
                         recoveryEdges={recoveryEdges}
+                        currentTimestamp={currentTimestamp}
                     />
                 )}
 

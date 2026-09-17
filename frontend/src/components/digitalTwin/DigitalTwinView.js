@@ -640,21 +640,21 @@ function SceneContent({ sources, sinks, connections, optimizedRoutes, recoveryEd
 }
 
 // ─── Info Panel ───────────────────────────────────────────────────────────────
-function InfoPanel({ selected, sources, sinks, optimizedRoutes }) {
+function InfoPanel({ selected, sources, sinks, optimizedRoutes, currentTimestamp }) {
     const s = selected;
     return (
         <div style={{
-            width: 280, background: '#030c16',
+            width: 320, background: '#030c16',
             borderLeft: '1px solid #0a3050',
             display: 'flex', flexDirection: 'column',
         }}>
             <div style={{ padding: '12px 16px', borderBottom: '1px solid #0a2a40', background: '#040f1c' }}>
                 <div style={{ fontSize: 10, color: '#3a6a84', letterSpacing: '0.1em', fontWeight: 700 }}>
-                    {s ? 'SELECTED' : 'SITE OVERVIEW'}
+                    {s ? (s.properties?.type === 'connection' || s.properties?.type === 'recovery_route' ? 'PIPE' : s.properties?.type?.toUpperCase() || 'SELECTED') : 'SITE OVERVIEW'}
                 </div>
                 {s && (
-                    <div style={{ marginTop: 3, fontSize: 13, color: '#00d4ff', fontWeight: 600 }}>
-                        {s.properties?.name || '—'}
+                    <div style={{ marginTop: 3, fontSize: 14, color: '#00e8ff', fontWeight: 600 }}>
+                        {s.properties?.name || s.properties?.id || '—'}
                     </div>
                 )}
             </div>
@@ -679,15 +679,36 @@ function InfoPanel({ selected, sources, sinks, optimizedRoutes }) {
                 ) : (
                     <>
                         {s.properties && Object.entries(s.properties)
-                            .filter(([k]) => !['id', 'feature_type', 'type'].includes(k))
-                            .map(([k, v]) => (
-                                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #081828' }}>
-                                    <span style={{ color: '#3a6a84', textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}</span>
-                                    <span style={{ color: '#b0d4e8', maxWidth: 130, textAlign: 'right', wordBreak: 'break-word' }}>
-                                        {v === null ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v)}
-                                    </span>
-                                </div>
-                            ))}
+                            .filter(([k]) => !['id', 'feature_type', 'type', 'name'].includes(k))
+                            .map(([k, v]) => {
+                                let displayVal = v;
+                                if (v === null || v === undefined) displayVal = '—';
+                                else if (typeof v === 'object') displayVal = JSON.stringify(v);
+                                else if (typeof v === 'number' && !Number.isInteger(v)) displayVal = v.toFixed(2);
+
+                                return (
+                                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #081828' }}>
+                                        <span style={{ color: '#3a6a84', textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}</span>
+                                        <span style={{ color: '#b0d4e8', maxWidth: 160, textAlign: 'right', wordBreak: 'break-word' }}>
+                                            {displayVal}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+
+                        {/* Appended Simulated Sensor Information */}
+                        <div style={{ marginTop: 20 }}>
+                            <div style={{ fontSize: 10, color: '#3a6a84', letterSpacing: '0.1em', fontWeight: 700, paddingBottom: 6, borderBottom: '1px solid #081828' }}>
+                                TIMESTAMP
+                            </div>
+                            <div style={{ padding: '8px 0', color: '#e8f4f8' }}>
+                                {currentTimestamp ? new Date(currentTimestamp).toLocaleString() : new Date().toLocaleString()}
+                            </div>
+                            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, color: '#22c55e', fontSize: 11, fontWeight: 'bold', letterSpacing: '0.05em' }}>
+                                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }}></span>
+                                SIMULATED SENSOR
+                            </div>
+                        </div>
                     </>
                 )}
             </div>
@@ -709,8 +730,9 @@ function Legend() {
                 ['#22c55e', '● Reuse Tank'],
                 ['#f59e0b', '▼ Water Sink'],
                 ['#a855f7', '■ Treatment Unit'],
-                ['#00d4ff', '━ Optimized Pipe'],
-                ['#0a3050', '╌ Network Pipe'],
+                ['#00e8ff', '━ Optimized Supply'],
+                ['#00ff7f', '━ Optimized Recovery'],
+                ['#1a4a7a', '╌ Network Pipe'],
             ].map(([c, l]) => (
                 <span key={l} style={{ fontSize: 10, color: c, whiteSpace: 'nowrap' }}>{l}</span>
             ))}
@@ -719,7 +741,7 @@ function Legend() {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function DigitalTwinView({ sources, sinks, connections, optimizedRoutes }) {
+export default function DigitalTwinView({ sources, sinks, connections, optimizedRoutes, currentTimestamp }) {
     const [selected, setSelected] = useState(null);
     const [resetKey, setResetKey] = useState(0);
 
@@ -766,6 +788,7 @@ export default function DigitalTwinView({ sources, sinks, connections, optimized
                 selected={selected}
                 sources={sources} sinks={sinks}
                 optimizedRoutes={optimizedRoutes}
+                currentTimestamp={currentTimestamp}
             />
         </div>
     );

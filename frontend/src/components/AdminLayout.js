@@ -8,6 +8,7 @@ const NAV_SECTIONS = [
         label: 'Admin',
         links: [
             { to: '/admin/dashboard', icon: '⬡', label: 'Dashboard' },
+            { to: '/admin/designer', icon: '🏗', label: 'Network Designer' },
             { to: '/admin/network', icon: '🗺', label: 'Digital Twin' },
             { to: '/admin/optimization', icon: '⚡', label: 'Optimization' },
             { to: '/admin/water-quality', icon: '💧', label: 'Water Quality' },
