@@ -3,9 +3,10 @@ import { MapContainer, ImageOverlay, CircleMarker, Polyline, Tooltip, LayerGroup
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import api, { getNetworkGeoJSON } from '../services/api';
-import { useSite } from '../hooks/useSite';
 import DigitalTwinView from '../components/digitalTwin/DigitalTwinView';
 import SimulationControlPanel from '../components/simulation/SimulationControlPanel';
+import PIDRenderer from '../components/pid/PIDRenderer';
+import { getPIDDocumentBySite, getPIDGraph } from '../services/api';
 
 const DEMO_CENTER = [13.0827, 80.2785]; // Chennai demo coords
 
@@ -190,6 +191,7 @@ export default function NetworkMapPage() {
     const [error, setError] = useState('');
     const [viewMode, setViewMode] = useState('2d');
     const [currentTimestamp, setCurrentTimestamp] = useState(null);
+    const [pidGraph, setPidGraph] = useState(null);
 
     const fetchGraph = async () => {
         if (!activeSiteId) return;
@@ -198,6 +200,16 @@ export default function NetworkMapPage() {
             setSite(siteRes.data);
             const geoRes = await getNetworkGeoJSON(activeSiteId);
             setGeoJSON(geoRes);
+            try {
+                const pidDocId = await getPIDDocumentBySite(activeSiteId);
+                if (pidDocId) {
+                    const g = await getPIDGraph(pidDocId);
+                    setPidGraph(g);
+                }
+            } catch (e) {
+                // Ignore if no PID graph is present for this site
+                console.log("No PID Diagram found for site");
+            }
         } catch (e) {
             console.error(e);
             setError('Failed to load network data');

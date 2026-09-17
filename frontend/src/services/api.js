@@ -59,6 +59,10 @@ export const getSites = () => api.get('/api/sites/').then((r) => r.data.results 
 export const getSite = (id) => api.get(`/api/sites/${id}/`).then((r) => r.data);
 export const createSite = (data) => api.post('/api/sites/', data).then((r) => r.data);
 
+// ── PID Engine ───────────────────────────────────────────
+export const getPIDGraph = (pidId) => api.get(`/api/pid/${pidId}/graph/`).then((r) => r.data);
+export const getPIDDocumentBySite = (siteId) => api.get(`/api/pid/?site=${siteId}`).then(r => r.data.length ? Math.max(...r.data.map(d => d.id)) : null);
+
 // ── Network ───────────────────────────────────────────────
 export const getSources = (siteId) => api.get(`/api/sites/${siteId}/sources/`).then((r) => r.data.results || r.data);
 export const getSinks = (siteId) => api.get(`/api/sites/${siteId}/sinks/`).then((r) => r.data.results || r.data);
