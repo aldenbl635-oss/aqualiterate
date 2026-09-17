@@ -8,7 +8,7 @@ import SimulationControlPanel from '../components/simulation/SimulationControlPa
 
 const DEMO_CENTER = [13.0827, 80.2785]; // Chennai demo coords
 
-function SourceMarker({ feature }) {
+function SourceMarker({ feature, currentTimestamp }) {
     const p = feature.properties;
     const pos = feature.geometry ? [feature.geometry.coordinates[1], feature.geometry.coordinates[0]] : null;
     if (!pos) return null;
@@ -26,15 +26,25 @@ function SourceMarker({ feature }) {
             <Tooltip>
                 <strong>{p.name}</strong><br />
                 Type: {p.source_type}<br />
-                Flow: {p.available_flow} {p.unit || 'm³/h'}<br />
-                {p.is_freshwater ? '💧 Freshwater' : '♻ Reuse'}<br />
-                <em style={{ fontSize: 10, opacity: 0.7 }}>DEMO DATA</em>
+
+                {p.old_flow !== undefined && (
+                    <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #ddd' }}>
+                        <div>Flow: {p.old_flow?.toFixed(1)} → <strong>{p.flow?.toFixed(1)}</strong> ({((p.flow - p.old_flow) > 0 ? '+' : '')}{(p.flow - p.old_flow)?.toFixed(1)})</div>
+                        {p.pH && <div>pH: {p.old_pH?.toFixed(2)} → <strong>{p.pH?.toFixed(2)}</strong> ({((p.pH - p.old_pH) > 0 ? '+' : '')}{(p.pH - p.old_pH)?.toFixed(2)})</div>}
+                        {p.TSS && <div>TSS: {p.old_TSS?.toFixed(1)} → <strong>{p.TSS?.toFixed(1)}</strong></div>}
+                    </div>
+                )}
+
+                <div style={{ marginTop: 8, fontSize: 10, color: '#22c55e', fontWeight: 'bold' }}>
+                    {currentTimestamp ? new Date(currentTimestamp).toLocaleString() : ''}<br />
+                    ● SIMULATED SENSOR
+                </div>
             </Tooltip>
         </CircleMarker>
     );
 }
 
-function SinkMarker({ feature }) {
+function SinkMarker({ feature, currentTimestamp }) {
     const p = feature.properties;
     const pos = feature.geometry ? [feature.geometry.coordinates[1], feature.geometry.coordinates[0]] : null;
     if (!pos) return null;
@@ -52,15 +62,24 @@ function SinkMarker({ feature }) {
         >
             <Tooltip>
                 <strong>{p.name}</strong><br />
-                Required: {p.required_flow} {p.unit || 'm³/h'}<br />
                 {p.is_terminal ? '🚰 Terminal Discharge' : '♻ Recovers to further use'}<br />
-                <em style={{ fontSize: 10, opacity: 0.7 }}>DEMO DATA</em>
+
+                {p.old_flow !== undefined && (
+                    <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #ddd' }}>
+                        <div>Demand: {p.old_flow?.toFixed(1)} → <strong>{p.flow?.toFixed(1)}</strong> ({((p.flow - p.old_flow) > 0 ? '+' : '')}{(p.flow - p.old_flow)?.toFixed(1)})</div>
+                    </div>
+                )}
+
+                <div style={{ marginTop: 8, fontSize: 10, color: '#22c55e', fontWeight: 'bold' }}>
+                    {currentTimestamp ? new Date(currentTimestamp).toLocaleString() : ''}<br />
+                    ● SIMULATED SENSOR
+                </div>
             </Tooltip>
         </CircleMarker>
     );
 }
 
-function RoutePolyline({ positions, isOptimized, isRecovery, featureProps }) {
+function RoutePolyline({ positions, isOptimized, isRecovery, featureProps, currentTimestamp }) {
     if (!positions || positions.length < 2) return null;
 
     // Choose color based on pipe type
@@ -70,6 +89,8 @@ function RoutePolyline({ positions, isOptimized, isRecovery, featureProps }) {
     } else if (isRecovery) {
         color = '#22c55e'; // Bright green for recovery
     }
+
+    const p = featureProps || {};
 
     return (
         <>
@@ -95,13 +116,26 @@ function RoutePolyline({ positions, isOptimized, isRecovery, featureProps }) {
                 {(isOptimized || isRecovery) && (
                     <Tooltip>
                         <strong>{isRecovery ? 'Wastewater Recovery Route' : 'Optimized Supply Route'}</strong><br />
-                        {featureProps && featureProps.allocated_flow && (
-                            <>Flow: {featureProps.allocated_flow} m³/h<br /></>
+                        {p.allocated_flow && (
+                            <>Allocated Flow: {p.allocated_flow} m³/h<br /></>
                         )}
-                        {featureProps && featureProps.treatment_required && (
+                        {p.treatment_required && (
                             <>Treatment: Yes<br /></>
                         )}
-                        <em style={{ fontSize: 10, opacity: 0.7 }}>{isRecovery ? 'Cycle completion' : 'DEMO ASSUMPTIONS'}</em>
+
+                        {p.old_pH !== undefined && (
+                            <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #ddd' }}>
+                                <div>pH: {p.old_pH?.toFixed(2)} → <strong>{p.pH?.toFixed(2)}</strong> ({((p.pH - p.old_pH) > 0 ? '+' : '')}{(p.pH - p.old_pH)?.toFixed(2)})</div>
+                                <div>TSS: {p.old_TSS?.toFixed(1)} → <strong>{p.TSS?.toFixed(1)}</strong> ({((p.TSS - p.old_TSS) > 0 ? '+' : '')}{(p.TSS - p.old_TSS)?.toFixed(1)})</div>
+                                <div>BOD: {p.old_BOD?.toFixed(1)} → <strong>{p.BOD?.toFixed(1)}</strong> ({((p.BOD - p.old_BOD) > 0 ? '+' : '')}{(p.BOD - p.old_BOD)?.toFixed(1)})</div>
+                                <div>COD: {p.old_COD?.toFixed(1)} → <strong>{p.COD?.toFixed(1)}</strong> ({((p.COD - p.old_COD) > 0 ? '+' : '')}{(p.COD - p.old_COD)?.toFixed(1)})</div>
+                            </div>
+                        )}
+
+                        <div style={{ marginTop: 8, fontSize: 10, color: '#22c55e', fontWeight: 'bold' }}>
+                            {currentTimestamp ? new Date(currentTimestamp).toLocaleString() : ''}<br />
+                            ● SIMULATED SENSOR
+                        </div>
                     </Tooltip>
                 )}
             </Polyline>
@@ -243,25 +277,25 @@ export default function NetworkMapPage() {
                                 {optimizedRoutes.map((f, i) => {
                                     const coords = f.geometry?.coordinates;
                                     if (!coords) return null;
-                                    return <RoutePolyline key={`opt-${i}`} positions={coords.map(c => [c[1], c[0]])} isOptimized={true} isRecovery={false} featureProps={f.properties} />;
+                                    return <RoutePolyline key={`opt-${i}`} positions={coords.map(c => [c[1], c[0]])} isOptimized={true} isRecovery={false} featureProps={f.properties} currentTimestamp={currentTimestamp} />;
                                 })}
                             </LayerGroup>
 
                             {/* Cycle recovery edges */}
                             <LayerGroup>
                                 {recoveryEdges.map((re, i) => (
-                                    <RoutePolyline key={`rec-${i}`} positions={re.positions} isOptimized={false} isRecovery={true} featureProps={re.properties} />
+                                    <RoutePolyline key={`rec-${i}`} positions={re.positions} isOptimized={false} isRecovery={true} featureProps={re.properties} currentTimestamp={currentTimestamp} />
                                 ))}
                             </LayerGroup>
 
                             {/* Sources */}
                             <LayerGroup>
-                                {sources.map((f, i) => <SourceMarker key={`src-${i}`} feature={f} />)}
+                                {sources.map((f, i) => <SourceMarker key={`src-${i}`} feature={f} currentTimestamp={currentTimestamp} />)}
                             </LayerGroup>
 
                             {/* Sinks */}
                             <LayerGroup>
-                                {sinks.map((f, i) => <SinkMarker key={`snk-${i}`} feature={f} />)}
+                                {sinks.map((f, i) => <SinkMarker key={`snk-${i}`} feature={f} currentTimestamp={currentTimestamp} />)}
                             </LayerGroup>
                         </MapContainer>
                     </div>

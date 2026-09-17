@@ -54,15 +54,27 @@ export default function NetworkDesignerPage() {
     const handleUploadLayout = async (e) => {
         const file = e.target.files[0];
         if (!file || !activeSiteId) return;
+
+        setOptStatus('Uploading...');
         const formData = new FormData();
         formData.append('layout_image', file);
         try {
             await api.patch(`/api/sites/${activeSiteId}/`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
+
+            setOptStatus('Processing Layout (Detecting Objects)...');
+            await api.post(`/api/sites/${activeSiteId}/process_layout/`);
+
+            setOptStatus('Generating Digital Twin (Optimizing Network)...');
+            await api.post(`/api/sites/${activeSiteId}/optimization/run/`);
+
+            setOptStatus('Digital Twin Ready');
             loadData();
+            setTimeout(() => setOptStatus(''), 3000);
         } catch (err) {
             console.error(err);
+            setOptStatus('FAILED TO PROCESS LAYOUT');
         }
     };
 

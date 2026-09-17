@@ -678,23 +678,79 @@ function InfoPanel({ selected, sources, sinks, optimizedRoutes, currentTimestamp
                     </>
                 ) : (
                     <>
-                        {s.properties && Object.entries(s.properties)
-                            .filter(([k]) => !['id', 'feature_type', 'type', 'name'].includes(k))
-                            .map(([k, v]) => {
-                                let displayVal = v;
-                                if (v === null || v === undefined) displayVal = '—';
-                                else if (typeof v === 'object') displayVal = JSON.stringify(v);
-                                else if (typeof v === 'number' && !Number.isInteger(v)) displayVal = v.toFixed(2);
+                        {(() => {
+                            const p = s.properties || {};
+                            const standardProps = [];
+                            const sensorProps = [];
 
-                                return (
-                                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #081828' }}>
-                                        <span style={{ color: '#3a6a84', textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}</span>
-                                        <span style={{ color: '#b0d4e8', maxWidth: 160, textAlign: 'right', wordBreak: 'break-word' }}>
-                                            {displayVal}
-                                        </span>
-                                    </div>
-                                );
-                            })}
+                            Object.keys(p).forEach(k => {
+                                if (['id', 'feature_type', 'type', 'name'].includes(k) || k.startsWith('old_')) return;
+
+                                if (p.hasOwnProperty(`old_${k}`)) {
+                                    sensorProps.push(k);
+                                } else {
+                                    standardProps.push(k);
+                                }
+                            });
+
+                            return (
+                                <>
+                                    {/* Standard Properties */}
+                                    {standardProps.map(k => {
+                                        let v = p[k];
+                                        let displayVal = v;
+                                        if (v === null || v === undefined) displayVal = '—';
+                                        else if (typeof v === 'object') displayVal = JSON.stringify(v);
+                                        else if (typeof v === 'number' && !Number.isInteger(v)) displayVal = v.toFixed(2);
+
+                                        return (
+                                            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #081828' }}>
+                                                <span style={{ color: '#3a6a84', textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}</span>
+                                                <span style={{ color: '#b0d4e8', maxWidth: 160, textAlign: 'right', wordBreak: 'break-word' }}>
+                                                    {displayVal}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+
+                                    {/* Sensor / Telemetry Properties with Delta */}
+                                    {sensorProps.length > 0 && (
+                                        <div style={{ marginTop: 20 }}>
+                                            <div style={{ fontSize: 10, color: '#3a6a84', letterSpacing: '0.1em', fontWeight: 700, paddingBottom: 6, borderBottom: '1px solid #081828', display: 'flex', justifyContent: 'space-between' }}>
+                                                <span>PARAMETER</span>
+                                                <div style={{ display: 'flex', gap: 10 }}>
+                                                    <span style={{ width: 45, textAlign: 'right' }}>PREV</span>
+                                                    <span style={{ width: 45, textAlign: 'right' }}>CURR</span>
+                                                    <span style={{ width: 45, textAlign: 'right' }}>CHG</span>
+                                                </div>
+                                            </div>
+                                            {sensorProps.map(k => {
+                                                const v = p[k];
+                                                const oldV = p[`old_${k}`];
+                                                const delta = v !== null && oldV !== null ? (v - oldV) : 0;
+
+                                                let deltaStr = '—';
+                                                let deltaCol = '#6b7280';
+                                                if (delta > 0) { deltaStr = `+${delta.toFixed(2)}`; deltaCol = '#ef4444'; }
+                                                else if (delta < 0) { deltaStr = delta.toFixed(2); deltaCol = '#22c55e'; }
+                                                else if (v !== null && oldV !== null) { deltaStr = '0.00'; }
+
+                                                return (
+                                                    <div key={`sensor-${k}`} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #081828' }}>
+                                                        <span style={{ color: '#00e8ff', textTransform: 'capitalize', fontWeight: 600 }}>{k.replace(/_/g, ' ')}</span>
+                                                        <div style={{ display: 'flex', gap: 10, color: '#b0d4e8' }}>
+                                                            <span style={{ width: 45, textAlign: 'right', color: '#6b7280' }}>{oldV !== null ? Number(oldV).toFixed(1) : '—'}</span>
+                                                            <span style={{ width: 45, textAlign: 'right', fontWeight: 'bold' }}>{v !== null ? Number(v).toFixed(1) : '—'}</span>
+                                                            <span style={{ width: 45, textAlign: 'right', color: deltaCol, fontWeight: 'bold' }}>{deltaStr}</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
 
                         {/* Appended Simulated Sensor Information */}
                         <div style={{ marginTop: 20 }}>

@@ -73,6 +73,7 @@ class NetworkConnectionViewSet(viewsets.ModelViewSet):
 
 from rest_framework.decorators import api_view, permission_classes
 from apps.optimization.models import OptimizationRun, OptimizationRoute
+from apps.simulation.models import MonitoringReading
 from apps.sites.models import Site
 
 
@@ -86,6 +87,37 @@ def network_geojson(request, site_pk):
         return Response({'error': 'Site not found'}, status=404)
 
     features = []
+
+    # Get recent readings
+    recent_readings = MonitoringReading.objects.filter(site=site).order_by('-timestamp')[:200]
+    reading_map = {'sources': {}, 'sinks': {}}
+    for r in recent_readings:
+        if r.source_id and r.source_id not in reading_map['sources']:
+            # grab top 2
+            reading_map['sources'][r.source_id] = [r]
+        elif r.source_id and len(reading_map['sources'][r.source_id]) < 2:
+            reading_map['sources'][r.source_id].append(r)
+            
+        if r.sink_id and r.sink_id not in reading_map['sinks']:
+            reading_map['sinks'][r.sink_id] = [r]
+        elif r.sink_id and len(reading_map['sinks'][r.sink_id]) < 2:
+            reading_map['sinks'][r.sink_id].append(r)
+            
+    def append_readings(props, r_list):
+        if r_list and len(r_list) > 0:
+            c = r_list[0]
+            props['flow'] = c.flow_rate
+            props['pH'] = c.ph
+            props['TSS'] = c.tss
+            props['BOD'] = c.bod
+            props['COD'] = c.cod
+            if len(r_list) > 1:
+                p = r_list[1]
+                props['old_flow'] = p.flow_rate
+                props['old_pH'] = p.ph
+                props['old_TSS'] = p.tss
+                props['old_BOD'] = p.bod
+                props['old_COD'] = p.cod
 
     # Zones
     for zone in site.zones.all():
@@ -119,6 +151,7 @@ def network_geojson(request, site_pk):
                 'zone_name': src.zone.name if src.zone else None,
             }
         })
+        append_readings(features[-1]['properties'], reading_map['sources'].get(src.id, []))
 
     # Sinks
     for sink in site.sinks.select_related('quality_requirement', 'zone').all():
@@ -139,6 +172,7 @@ def network_geojson(request, site_pk):
                 'zone_name': sink.zone.name if sink.zone else None,
             }
         })
+        append_readings(features[-1]['properties'], reading_map['sinks'].get(sink.id, []))
 
     # Active network connections
     for conn in site.connections.select_related('source', 'sink').filter(is_active=True):
@@ -177,6 +211,7 @@ def network_geojson(request, site_pk):
                     'sink_name': route.sink.name if route.sink else None,
                 }
             })
+            append_readings(features[-1]['properties'], reading_map['sources'].get(route.source_id, []))
 
     return Response({
         'type': 'FeatureCollection',
