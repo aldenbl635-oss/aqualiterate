@@ -46,12 +46,30 @@ export default function NetworkDesignerPage() {
         loadData();
     }, [activeSiteId]);
 
+    const fileInputRef = useRef(null);
+
     const handleFileSelect = (e) => {
         const file = e.target.files[0];
         if (!file) return;
+
+        if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+        }
+
         setSelectedFile(file);
         setPreviewUrl(URL.createObjectURL(file));
         setWorkflowStep(2);
+
+        // Reset the zones and selected zone so they don't carry over to the new preview immediately
+        setZones([]);
+        setSelectedZone(null);
+    };
+
+    const handleReplaceLayout = () => {
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+            fileInputRef.current.click();
+        }
     };
 
     const handleSubmitLayout = async () => {
@@ -132,10 +150,9 @@ export default function NetworkDesignerPage() {
                 <div style={{ textAlign: 'center', padding: '100px 20px', border: '2px dashed #3a6a84', borderRadius: 8 }}>
                     <h3 style={{ color: '#b0d4e8' }}>INDUSTRIAL LAYOUT</h3>
                     <p style={{ color: '#6b8a9e', maxWidth: 400, margin: '15px auto' }}>Upload your organization's physical layout diagram to create its image-based digital twin. No GPS or geographic location is required.</p>
-                    <label className="btn btn-primary cursor-pointer mt-4" style={{ fontSize: 16, padding: '10px 24px' }}>
+                    <button className="btn btn-primary mt-4" style={{ fontSize: 16, padding: '10px 24px' }} onClick={() => fileInputRef.current && fileInputRef.current.click()}>
                         UPLOAD LAYOUT
-                        <input type="file" hidden accept=".png,.jpg,.jpeg,.svg" onChange={handleFileSelect} />
-                    </label>
+                    </button>
                     <p style={{ marginTop: 15, fontSize: 12, color: '#4a7a94' }}>PNG • JPG • JPEG • SVG</p>
                 </div>
             );
@@ -149,6 +166,11 @@ export default function NetworkDesignerPage() {
                     alt="Industrial Layout"
                     crossOrigin="anonymous"
                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = '';
+                        setStatusText('⚠ Unable to load submitted layout. Image path error.');
+                    }}
                 />
 
                 {/* Zones Overlay */}
@@ -192,6 +214,9 @@ export default function NetworkDesignerPage() {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 20 }}>
+            {/* Global Hidden Input to prevent ref overlaps */}
+            <input ref={fileInputRef} type="file" hidden accept=".png,.jpg,.jpeg,.svg" onChange={handleFileSelect} />
+
             <div style={{ marginBottom: 20 }}>
                 <h1 className="page-title">Network Designer</h1>
 
@@ -227,6 +252,11 @@ export default function NetworkDesignerPage() {
                             </div>
                         </div>
                         <div className="flex gap-2">
+                            {workflowStep >= 2 && (
+                                <button className="btn btn-secondary btn-sm" onClick={handleReplaceLayout}>
+                                    REPLACE LAYOUT
+                                </button>
+                            )}
                             {workflowStep === 2 && (
                                 <button className="btn btn-primary btn-sm" onClick={handleSubmitLayout}>
                                     SUBMIT LAYOUT

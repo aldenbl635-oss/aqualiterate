@@ -162,6 +162,18 @@ function RoutePolyline({ positions, isOptimized, isRecovery, featureProps, curre
                         opacity: 1.0,
                         dashArray: '4, 16',
                     }}
+                    eventHandlers={{
+                        add: (e) => {
+                            let speed = 2.0; // default 2s
+                            if (p.allocated_flow) {
+                                // e.g. flow of 1000 = 0.4s, flow of 10 = 3s
+                                speed = Math.max(0.4, Math.min(3.0, 100 / p.allocated_flow));
+                            }
+                            if (e.target._path) {
+                                e.target._path.style.animationDuration = `${speed}s`;
+                            }
+                        }
+                    }}
                 />
             )}
         </>
