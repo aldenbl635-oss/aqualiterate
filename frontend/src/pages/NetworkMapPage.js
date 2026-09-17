@@ -42,8 +42,8 @@ function SinkMarker({ feature }) {
             center={pos}
             radius={10}
             pathOptions={{
-                color: '#f59e0b',
-                fillColor: '#f59e0b',
+                color: p.is_terminal ? '#ef4444' : '#f59e0b',
+                fillColor: p.is_terminal ? '#ef4444' : '#f59e0b',
                 fillOpacity: 0.6,
                 weight: 2,
                 dashArray: '4 2',
@@ -52,41 +52,77 @@ function SinkMarker({ feature }) {
             <Tooltip>
                 <strong>{p.name}</strong><br />
                 Required: {p.required_flow} {p.unit || 'm³/h'}<br />
+                {p.is_terminal ? '🚰 Terminal Discharge' : '♻ Recovers to further use'}<br />
                 <em style={{ fontSize: 10, opacity: 0.7 }}>DEMO DATA</em>
             </Tooltip>
         </CircleMarker>
     );
 }
 
-function RoutePolyline({ feature, isOptimized }) {
-    const p = feature.properties;
-    const coords = feature.geometry?.coordinates;
-    if (!coords || coords.length < 2) return null;
-    const positions = coords.map(c => [c[1], c[0]]);
+function RoutePolyline({ positions, isOptimized, isRecovery, featureProps }) {
+    if (!positions || positions.length < 2) return null;
+
+    // Choose color based on pipe type
+    let color = '#4a7a94'; // default connection
+    if (isOptimized) {
+        color = '#00d4ff'; // Bright cyan
+    } else if (isRecovery) {
+        color = '#22c55e'; // Bright green for recovery
+    }
+
     return (
-        <Polyline
-            positions={positions}
-            pathOptions={{
-                color: isOptimized ? '#00d4ff' : '#4a7a94',
-                weight: isOptimized ? 3 : 1.5,
-                opacity: isOptimized ? 0.85 : 0.4,
-                dashArray: isOptimized ? null : '6 4',
-            }}
-        >
-            {isOptimized && (
-                <Tooltip>
-                    <strong>Optimized Route</strong><br />
-                    Flow: {p.allocated_flow} m³/h<br />
-                    Quality: {p.quality_status}<br />
-                    Treatment: {p.treatment_required ? 'Yes' : 'No'}<br />
-                    Routing cost: {p.routing_cost}<br />
-                    Total cost: {p.total_cost}<br />
-                    <em style={{ fontSize: 10, opacity: 0.7 }}>DEMO DATA — costs are DEMO ASSUMPTIONS</em>
-                </Tooltip>
+        <>
+            {/* Base outer glow line */}
+            <Polyline
+                positions={positions}
+                pathOptions={{
+                    color: color,
+                    weight: isOptimized || isRecovery ? 6 : 2,
+                    opacity: isOptimized || isRecovery ? 0.3 : 0.2,
+                }}
+            />
+            {/* Inner solid core line */}
+            <Polyline
+                positions={positions}
+                pathOptions={{
+                    color: color,
+                    weight: isOptimized || isRecovery ? 3 : 1.5,
+                    opacity: isOptimized || isRecovery ? 0.9 : 0.4,
+                    dashArray: isOptimized || isRecovery ? null : '6 4',
+                }}
+            >
+                {(isOptimized || isRecovery) && (
+                    <Tooltip>
+                        <strong>{isRecovery ? 'Wastewater Recovery Route' : 'Optimized Supply Route'}</strong><br />
+                        {featureProps && featureProps.allocated_flow && (
+                            <>Flow: {featureProps.allocated_flow} m³/h<br /></>
+                        )}
+                        {featureProps && featureProps.treatment_required && (
+                            <>Treatment: Yes<br /></>
+                        )}
+                        <em style={{ fontSize: 10, opacity: 0.7 }}>{isRecovery ? 'Cycle completion' : 'DEMO ASSUMPTIONS'}</em>
+                    </Tooltip>
+                )}
+            </Polyline>
+
+            {/* Animated particles layer (on top of active pipes) */}
+            {(isOptimized || isRecovery) && (
+                <Polyline
+                    positions={positions}
+                    className="flow-anim-path"
+                    pathOptions={{
+                        color: '#ffffff',
+                        weight: 2,
+                        opacity: 1.0,
+                        dashArray: '4, 16',
+                    }}
+                />
             )}
-        </Polyline>
+        </>
     );
 }
+
+
 
 export default function NetworkMapPage() {
     const { activeSiteId } = useSite();
@@ -108,6 +144,24 @@ export default function NetworkMapPage() {
     const sinks = geoJSON?.features?.filter(f => f.properties.type === 'sink') || [];
     const connections = geoJSON?.features?.filter(f => f.properties.type === 'connection') || [];
     const optimizedRoutes = geoJSON?.features?.filter(f => f.properties.type === 'optimized_route') || [];
+
+    // Synthesize physical recovery routes to close the loop based on the backend graph
+    const recoveryEdges = [];
+    sinks.forEach(sink => {
+        const p = sink.properties;
+        const sinkPos = sink.geometry ? [sink.geometry.coordinates[1], sink.geometry.coordinates[0]] : null;
+        if (!p.is_terminal && p.recovery_source && sinkPos) {
+            const rSource = sources.find(s => s.properties.id === p.recovery_source);
+            if (rSource && rSource.geometry) {
+                const rsPos = [rSource.geometry.coordinates[1], rSource.geometry.coordinates[0]];
+                recoveryEdges.push({
+                    id: `rev-${sink.id}`,
+                    positions: [sinkPos, rsPos],
+                    properties: p
+                });
+            }
+        }
+    });
 
     return (
         <>
@@ -135,8 +189,9 @@ export default function NetworkMapPage() {
                             <span style={{ fontSize: '0.8rem', color: '#00d4ff' }}>● Freshwater Source</span>
                             <span style={{ fontSize: '0.8rem', color: '#22c55e' }}>● Reuse Source</span>
                             <span style={{ fontSize: '0.8rem', color: '#f59e0b' }}>⊙ Water Sink</span>
-                            <span style={{ fontSize: '0.8rem', color: '#00d4ff' }}>━ Optimized Route</span>
-                            <span style={{ fontSize: '0.8rem', color: '#4a7a94' }}>╌ Network Connection</span>
+                            <span style={{ fontSize: '0.8rem', color: '#ef4444' }}>⊙ Terminal Sink</span>
+                            <span style={{ fontSize: '0.8rem', color: '#00d4ff' }}>━ Supply Route (Flows)</span>
+                            <span style={{ fontSize: '0.8rem', color: '#22c55e' }}>━ Recovery Route (Flows)</span>
                         </div>
                     </div>
                 </div>
@@ -160,15 +215,26 @@ export default function NetworkMapPage() {
 
                             {/* Network connections (background) */}
                             <LayerGroup>
-                                {connections.map((f, i) => (
-                                    <RoutePolyline key={`conn-${i}`} feature={f} isOptimized={false} />
-                                ))}
+                                {connections.map((f, i) => {
+                                    const coords = f.geometry?.coordinates;
+                                    if (!coords) return null;
+                                    return <RoutePolyline key={`conn-${i}`} positions={coords.map(c => [c[1], c[0]])} isOptimized={false} isRecovery={false} />;
+                                })}
                             </LayerGroup>
 
                             {/* Optimized routes */}
                             <LayerGroup>
-                                {optimizedRoutes.map((f, i) => (
-                                    <RoutePolyline key={`opt-${i}`} feature={f} isOptimized={true} />
+                                {optimizedRoutes.map((f, i) => {
+                                    const coords = f.geometry?.coordinates;
+                                    if (!coords) return null;
+                                    return <RoutePolyline key={`opt-${i}`} positions={coords.map(c => [c[1], c[0]])} isOptimized={true} isRecovery={false} featureProps={f.properties} />;
+                                })}
+                            </LayerGroup>
+
+                            {/* Cycle recovery edges */}
+                            <LayerGroup>
+                                {recoveryEdges.map((re, i) => (
+                                    <RoutePolyline key={`rec-${i}`} positions={re.positions} isOptimized={false} isRecovery={true} featureProps={re.properties} />
                                 ))}
                             </LayerGroup>
 
@@ -191,6 +257,7 @@ export default function NetworkMapPage() {
                         sinks={sinks}
                         connections={connections}
                         optimizedRoutes={optimizedRoutes}
+                        recoveryEdges={recoveryEdges}
                     />
                 )}
 

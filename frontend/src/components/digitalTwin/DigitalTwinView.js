@@ -249,9 +249,19 @@ function TreatmentUnit({ position, onClick, isSelected }) {
 }
 
 // ─── Water Pipe (TubeGeometry) ─────────────────────────────────────────────────
-function WaterPipe({ points, isOptimized, isSelected, onClick }) {
-    const color = isSelected ? '#ffffff' : isOptimized ? '#00d4ff' : '#0a3050';
-    const radius = isOptimized ? 0.22 : 0.12;
+function WaterPipe({ points, isOptimized, isRecovery, isSelected, onClick }) {
+    let color = '#0a3050';
+    let emissive = '#000000';
+    let emissiveIntensity = 0;
+    const radius = (isOptimized || isRecovery) ? 0.22 : 0.12;
+
+    if (isSelected) {
+        color = '#ffffff'; emissive = '#ffffff'; emissiveIntensity = 1;
+    } else if (isOptimized) {
+        color = '#00d4ff'; emissive = '#00d4ff'; emissiveIntensity = 0.55;
+    } else if (isRecovery) {
+        color = '#22c55e'; emissive = '#22c55e'; emissiveIntensity = 0.55;
+    }
 
     const geometry = useMemo(() => {
         const curve = new THREE.CatmullRomCurve3(points.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
@@ -264,8 +274,8 @@ function WaterPipe({ points, isOptimized, isSelected, onClick }) {
         <mesh geometry={geometry} onClick={e => { e.stopPropagation(); onClick && onClick(); }}>
             <meshLambertMaterial
                 color={color}
-                emissive={isOptimized ? '#00d4ff' : '#000000'}
-                emissiveIntensity={isOptimized ? 0.55 : 0}
+                emissive={emissive}
+                emissiveIntensity={emissiveIntensity}
             />
         </mesh>
     );
@@ -346,7 +356,7 @@ function CameraController({ resetKey }) {
 }
 
 // ─── Scene Content  ────────────────────────────────────────────────────────────
-function SceneContent({ sources, sinks, connections, optimizedRoutes, onSelect, resetKey }) {
+function SceneContent({ sources, sinks, connections, optimizedRoutes, recoveryEdges = [], onSelect, resetKey }) {
     const [sel, setSel] = useState(null);
 
     const select = (data) => { setSel(data); onSelect(data); };
@@ -435,15 +445,42 @@ function SceneContent({ sources, sinks, connections, optimizedRoutes, onSelect, 
             const [sx, , sz] = si >= 0 ? srcPositions[si] : srcPositions[i % Math.max(srcPositions.length, 1)];
             const [ex, , ez] = ki >= 0 ? snkPositions[ki] : snkPositions[i % Math.max(snkPositions.length, 1)];
             const y = OPT_Y;
+
+            // Go via central treatment if treatment is required, otherwise L-shape
+            const pts = r.properties.treatment_required
+                ? [[sx, y, sz], [0, y, sz], [0, y, 0], [0, y, ez], [ex, y, ez]]
+                : [[sx, y, sz], [sx, y, ez], [ex, y, ez]];
+
             pipes.push({
-                points: [[sx, y, sz], [sx, y, ez], [ex, y, ez]],
+                points: pts,
                 optimized: true,
+                recovery: false,
                 data: r,
             });
         });
 
+        // Overlay recovery edges (green, elevated)
+        recoveryEdges.forEach((r, i) => {
+            const p = r.properties;
+            const kIdx = sinks.findIndex(s => s.properties.id === p.id);
+            const sIdx = sources.findIndex(s => s.properties.id === p.recovery_source);
+
+            if (kIdx >= 0 && sIdx >= 0) {
+                const [kx, , kz] = snkPositions[kIdx];
+                const [sx, , sz] = srcPositions[sIdx];
+                const y = OPT_Y + 0.5; // elevate recovery slightly higher
+
+                pipes.push({
+                    points: [[kx, y, kz], [sx, y, kz], [sx, y, sz]], // L shape from sink back to source
+                    optimized: false,
+                    recovery: true,
+                    data: { properties: Object.assign({}, p, { type: 'recovery_route', from: p.name, to: "Recovery Source" }) }
+                });
+            }
+        });
+
         return pipes;
-    }, [sources, sinks, srcPositions, snkPositions, optimizedRoutes]);
+    }, [sources, sinks, srcPositions, snkPositions, optimizedRoutes, recoveryEdges]);
 
     return (
         <>
@@ -539,20 +576,21 @@ function SceneContent({ sources, sinks, connections, optimizedRoutes, onSelect, 
                 />
             ))}
 
-            {/* ── Flow particles on optimized pipes ────────────────────────────── */}
+            {/* ── Flow particles on active pipes (optimized supply or recovery) ────── */}
             {allPipes
-                .filter(p => p.optimized)
+                .filter(p => p.optimized || p.recovery)
                 .map((p, i) =>
-                    [0, 0.33, 0.66].map(off => (
-                        <FlowParticle key={`fp-${i}-${off}`} points={p.points} offset={off} color="#00d4ff" />
-                    ))
+                    [0, 0.33, 0.66].map(off => {
+                        const col = p.recovery ? '#22c55e' : '#00d4ff';
+                        return <FlowParticle key={`fp-${i}-${off}`} points={p.points} offset={off} color={col} />;
+                    })
                 )}
-            {/* Ambient flow on first 2 base network pipes */}
+            {/* Minimal ambient flow on inactive network pipes */}
             {allPipes
-                .filter(p => !p.optimized)
+                .filter(p => !p.optimized && !p.recovery)
                 .slice(0, 2)
                 .map((p, i) => (
-                    <FlowParticle key={`fb-${i}`} points={p.points} offset={i * 0.5} color="#22c55e" />
+                    <FlowParticle key={`fb-${i}`} points={p.points} offset={i * 0.5} color="#4a7a94" />
                 ))}
         </>
     );

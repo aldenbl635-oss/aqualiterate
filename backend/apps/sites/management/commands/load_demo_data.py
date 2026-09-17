@@ -99,9 +99,9 @@ class Command(BaseCommand):
             }
         )
 
-        # Treated wastewater output profile
-        qp_treated, _ = WaterQualityProfile.objects.get_or_create(
-            name='Demo Treated Wastewater Profile',
+        # Cleaning recovery output profile
+        qp_cleaning_rec, _ = WaterQualityProfile.objects.get_or_create(
+            name='Demo Cleaning Recovery Profile',
             defaults={
                 'source': 'DEMO DATA — NOT TNPCB DATA',
                 'measurement_time': timezone.now(),
@@ -202,15 +202,15 @@ class Command(BaseCommand):
 
         )
 
-        src_treated, _ = WaterSource.objects.get_or_create(
-            site=site, name='Treated Wastewater',
+        src_cleaning_rec, _ = WaterSource.objects.get_or_create(
+            site=site, name='Cleaning Recovery Stream',
             defaults={
-                'zone': zones['Treatment Zone'],
-                'source_type': 'treated_effluent',
-                'description': 'DEMO: Effluent treatment plant output',
+                'zone': zones['Storage Zone'],
+                'source_type': 'process_reuse',
+                'description': 'DEMO: Recovered water from cleaning operations',
                 'available_flow': 25.0,
                 'unit': 'm3/h',
-                'quality_profile': qp_treated,
+                'quality_profile': qp_cleaning_rec,
                 'is_freshwater': False,
                 'location': {'type': 'Point', 'coordinates': [80.2796, 13.0836]},
             }
@@ -227,6 +227,8 @@ class Command(BaseCommand):
                 'unit': 'm3/h',
                 'quality_requirement': req_cooling,
                 'location': {'type': 'Point', 'coordinates': [80.2791, 13.0821]},
+                'recovery_source': src_reuse_a,
+                'is_terminal': False
             }
         )
 
@@ -240,6 +242,8 @@ class Command(BaseCommand):
                 'unit': 'm3/h',
                 'quality_requirement': req_process,
                 'location': {'type': 'Point', 'coordinates': [80.2782, 13.0829]},
+                'recovery_source': src_reuse_b,
+                'is_terminal': False
             }
         )
 
@@ -248,11 +252,12 @@ class Command(BaseCommand):
             defaults={
                 'zone': zones['Utility Zone'],
                 'sink_type': 'utility',
-                'description': 'DEMO: General utility water demand',
+                'description': 'DEMO: General utility water demand (terminal discharge)',
                 'required_flow': 15.0,
                 'unit': 'm3/h',
                 'quality_requirement': req_utility,
                 'location': {'type': 'Point', 'coordinates': [80.2788, 13.0822]},
+                'is_terminal': True
             }
         )
 
@@ -266,6 +271,8 @@ class Command(BaseCommand):
                 'unit': 'm3/h',
                 'quality_requirement': req_cleaning,
                 'location': {'type': 'Point', 'coordinates': [80.2779, 13.0830]},
+                'recovery_source': src_cleaning_rec,
+                'is_terminal': False
             }
         )
 
@@ -275,7 +282,7 @@ class Command(BaseCommand):
             defaults={
                 'description': 'DEMO: Biological + filtration treatment. Costs are DEMO ASSUMPTIONS.',
                 'treatment_type': 'biological_filtration',
-                'output_quality_profile': qp_treated,
+                'output_quality_profile': qp_cleaning_rec,
                 'max_flow': 40.0,
                 'cost_per_unit': 0.5,  # DEMO ASSUMPTION — not a real cost
                 'fixed_cost': 10.0,    # DEMO ASSUMPTION
@@ -292,9 +299,10 @@ class Command(BaseCommand):
             (src_reuse_a, sink_utility, None, 0.05),
             (src_reuse_b, sink_cooling, tx_etp, 0.08),
             (src_reuse_b, sink_utility, tx_etp, 0.08),
-            (src_treated, sink_cooling, None, 0.06),
-            (src_treated, sink_utility, None, 0.06),
-            (src_treated, sink_cleaning, None, 0.06),
+            (src_cleaning_rec, sink_cooling, None, 0.06),
+            (src_cleaning_rec, sink_utility, None, 0.06),
+            (src_cleaning_rec, sink_cleaning, None, 0.06),
+            (src_reuse_a, sink_cleaning, None, 0.05),
         ]
 
         for src, sink, tx, cost in connections:

@@ -116,6 +116,7 @@ def network_geojson(request, site_pk):
                 'unit': src.unit,
                 'is_freshwater': src.is_freshwater,
                 'quality_profile': src.quality_profile.id if src.quality_profile else None,
+                'zone_name': src.zone.name if src.zone else None,
             }
         })
 
@@ -133,6 +134,9 @@ def network_geojson(request, site_pk):
                 'required_flow': sink.required_flow,
                 'unit': sink.unit,
                 'quality_requirement': sink.quality_requirement.id if sink.quality_requirement else None,
+                'recovery_source': sink.recovery_source_id,
+                'is_terminal': sink.is_terminal,
+                'zone_name': sink.zone.name if sink.zone else None,
             }
         })
 
@@ -169,6 +173,8 @@ def network_geojson(request, site_pk):
                     'treatment_required': route.treatment_required,
                     'routing_cost': route.routing_cost,
                     'total_cost': route.total_cost,
+                    'source_name': route.source.name if route.source else None,
+                    'sink_name': route.sink.name if route.sink else None,
                 }
             })
 
